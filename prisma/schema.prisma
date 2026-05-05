@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDATE
+  RECRUITER
+}
+
+model User {
+  id        String   @id @default(uuid()) @map("user_ID")
+  email     String   @unique
+  password  String
+  role      Role     @default(CANDIDATE)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  candidateProfile CandidateProfile?
+  jobs             Job[]
+
+  @@map("users")
+}
+
+model Job {
+  id          String   @id @default(uuid()) @map("job_ID")
+  title       String
+  description String
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  recruiter User       @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  jobSkills JobSkill[]
+
+  @@map("jobs")
+}
+
+model JobSkill {
+  jobId   String @map("job_ID")
+  skillId String @map("skill_ID")
+  weight  Int    @default(3) // 1 to 5
+
+  job   Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, skillId])
+  @@map("job_skills")
+}
+
+model CandidateProfile {
+  id              String   @id @default(uuid()) @map("candidate_ID")
+  userId          String   @unique @map("user_ID")
+  name            String?
+  experienceYears Int?     @map("experience_years")
+  education       String?
+  resumeUrl       String?  @map("resume_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  candidateSkills CandidateSkill[]
+
+  @@map("candidate_profiles")
+}
+
+model Skill {
+  id              String           @id @default(uuid()) @map("skill_ID")
+  name            String           @unique
+  candidateSkills CandidateSkill[]
+  aliases         SkillAlias[]
+  jobSkills       JobSkill[]
+
+  prerequisitesFor SkillRelationship[] @relation("PrerequisiteFor")
+  requiredSkills   SkillRelationship[] @relation("RequiresSkill")
+
+  @@map("skills")
+}
+
+model SkillAlias {
+  alias   String @id
+  skillId String @map("skill_ID")
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@index([alias])
+  @@map("skill_aliases")
+}
+
+model SkillRelationship {
+  parentSkillId String @map("parent_skill_ID") // Prerequisite
+  childSkillId  String @map("child_skill_ID")  // Advanced
+
+  parent Skill @relation("PrerequisiteFor", fields: [parentSkillId], references: [id], onDelete: Cascade)
+  child  Skill @relation("RequiresSkill", fields: [childSkillId], references: [id], onDelete: Cascade)
+
+  @@id([parentSkillId, childSkillId])
+  @@map("skill_relationships")
+}
+
+
+model CandidateSkill {
+  candidateId String @map("candidate_ID")
+  skillId     String @map("skill_ID")
+
+  candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skill     Skill            @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([candidateId, skillId])
+  @@map("candidate_skills")
+}
